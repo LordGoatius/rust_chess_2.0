@@ -1,4 +1,5 @@
 use core::fmt::Display;
+use std::cmp;
 use std::error::Error;
 use std::io;
 
@@ -78,7 +79,9 @@ impl Game {
             };
 
             // TODO check if move out of check is necessary
-
+            
+            let mut check = self.is_king_in_check(turn_color);
+            
             println!("Input start square {turn_color}");
             let start_move = coordinate_from_input();
             let start_move_coords: Coordinates;
@@ -117,6 +120,15 @@ impl Game {
 
             // TODO if move out of check is necessary, make sure move moves out of check
             // if it doesn't continue the loop
+
+            if check {
+                let mut test = self.clone();
+                let _ = test.make_move(start_move_coords, end_move_coords);
+                if test.is_king_in_check(turn_color) {
+                    println!("Must move out of check");
+                    continue;
+                }
+            }
 
             // We KNOW:
             //     Correct piece color
@@ -161,7 +173,7 @@ impl Game {
             }
 
             // checks if move checkmates the enemy king
-            if self.check_checkmate(turn_color.swap()) == true {
+            if self.is_king_in_check(turn_color.swap()) && (self.check_checkmate(turn_color) == true) {
                 println!("{turn_color} Wins!");
                 break;
             }
@@ -171,8 +183,51 @@ impl Game {
         }
     }
 
-    pub fn check_checkmate(&self, turn_color: PieceColor) -> bool {
+    pub fn is_king_in_check(&mut self, color: PieceColor) -> bool {
+        for row in self.board.board {
+            for piece_option in row {
+                if let Some(piece) = piece_option {
+                    if let PieceType::King(_) = piece.piece_type {
+                        if color == piece.color {
+                            if self.is_coord_attacked_by_team(color.swap(), piece.coordinates) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
         false
+    }
+
+    /// Checks if the king of the opposite color is in checkmate
+    pub fn check_checkmate(&self, turn_color: PieceColor) -> bool {
+        let mut enemy_king_coords = Coordinates(0, 0);
+
+        for row in self.board.board {
+            for piece_option in row {
+                if let Some(piece) = piece_option {
+                    if let PieceType::King(_) = piece.piece_type {
+                        if turn_color.swap() == piece.color {
+                            enemy_king_coords = piece.coordinates;
+                        }
+                    }
+                }
+            }
+        }
+        for i in -1i8..=1 {
+            for j in -1i8..=1 {
+                let mut cloned_board = self.clone();
+                let status = cloned_board.make_move(enemy_king_coords, Coordinates(cmp::max(cmp::min(0, enemy_king_coords.0 as i8 + i), 7) as u8, cmp::max(cmp::min(0, enemy_king_coords.0 as i8 + j), 7) as u8));
+                if let Ok(_) = status {
+                    if !cloned_board.is_king_in_check(turn_color.swap()) {
+                        return false;
+                    }
+                }
+
+            }
+        }
+        true
     }
 
     pub fn handle_promotion(&mut self, coords: Coordinates) {
@@ -221,7 +276,7 @@ impl Game {
                            _ => (),
                        }
                    }
-                   if let Some(piece_2) = &mut self.at(Coordinates(end.0, (end.1 as i8 + 1).abs() as u8)).as_mut() {
+                   if let Some(piece_2) = &mut self.at(Coordinates(end.0, cmp::min((end.1 as i8 + 1).abs() as u8, 7))).as_mut() {
                        match piece_2.piece_type {
                            PieceType::Pawn(_) => {
                                self.at(Coordinates(end.0, (end.1 as i8 + 1).abs() as u8)).as_mut().unwrap().piece_type =

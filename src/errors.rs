@@ -1,5 +1,4 @@
 use std::{error::Error, fmt::Display, i8};
-use crate::piece::Coordinates;
 
 // GameError
 
@@ -70,6 +69,20 @@ impl Convertable for i8 {
             return Err(Box::new(ConversionError));
         } else {
             return Ok(*self as u8)
+        }
+    }
+}
+
+trait Ceiling {
+    fn ceil(self, max: u8) -> u8;
+}
+
+impl Ceiling for u8 {
+    fn ceil(self, max: u8) -> u8 {
+        if self > max {
+            max
+        } else {
+            self
         }
     }
 }
